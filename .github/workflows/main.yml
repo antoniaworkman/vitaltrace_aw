@@ -150,6 +150,15 @@ jobs:
           echo "--- Contents of ncs dir ---"
           ls ~/ncs/ 2>/dev/null || echo "ncs dir not found"
 
+          echo "--- Search for hex files anywhere under ~/ncs ---"
+          find ~/ncs -name "*.hex" 2>/dev/null
+
+          echo "--- Contents of _sysbuild ---"
+          ls ~/ncs/build/_sysbuild/ 2>/dev/null
+
+          echo "--- Recursive build structure (dirs only) ---"
+          find ~/ncs/build -type d 2>/dev/null
+
       # ------------------------------------------------------------------------
       - name: Verify build artefacts exist
         run: |
