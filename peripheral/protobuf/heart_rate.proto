@@ -1,0 +1,6 @@
+syntax = "proto3";
+
+message Notify {
+    uint32 index  = 1;          // packet sequence number
+    bytes hr_buffer = 2;        // data payload
+}

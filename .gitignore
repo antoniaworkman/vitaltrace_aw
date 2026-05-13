@@ -1,0 +1,8 @@
+# editors
+*.swp
+*~
+*.vscode
+
+# build
+/peripheral/build*/
+/peripheral/tests/build*/
