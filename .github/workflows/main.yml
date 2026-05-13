@@ -132,11 +132,23 @@ jobs:
             vitaltrace/${{ env.APP_DIR }} \
             -- \
             -DCONFIG_BOOTLOADER_MCUBOOT=n \
-            2>&1 | tee build.log
+            2>&1 | tee ${{ github.workspace }}/build.log
 
           echo "=========================================="
           echo " Build complete"
           echo "=========================================="
+
+      - name: Debug — find build artefacts
+        if: always()
+        run: |
+          echo "--- Full build directory tree ---"
+          find ~/ncs/build -type f \( -name "*.hex" -o -name "*.bin" -o -name "*.elf" \) 2>/dev/null
+
+          echo "--- Top level of build dir ---"
+          ls ~/ncs/build/ 2>/dev/null || echo "build dir not found"
+
+          echo "--- Contents of ncs dir ---"
+          ls ~/ncs/ 2>/dev/null || echo "ncs dir not found"
 
       # ------------------------------------------------------------------------
       - name: Verify build artefacts exist
