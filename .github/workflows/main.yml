@@ -143,9 +143,9 @@ jobs:
         run: |
           echo "--- Checking for expected artefacts ---"
 
-          HEX=~/ncs/build/zephyr/zephyr.hex
-          BIN=~/ncs/build/zephyr/zephyr.bin
-          ELF=~/ncs/build/zephyr/zephyr.elf
+          HEX=~/ncs/build/peripheral/zephyr/zephyr.hex
+          BIN=~/ncs/build/peripheral/zephyr/zephyr.bin
+          ELF=~/ncs/build/peripheral/zephyr/zephyr.elf
 
           for f in "$HEX" "$BIN" "$ELF"; do
             if [ -f "$f" ]; then
@@ -170,9 +170,9 @@ jobs:
           ARTEFACT_DIR=${{ github.workspace }}/artefacts/${{ matrix.board }}
           mkdir -p "$ARTEFACT_DIR"
 
-          cp ~/ncs/build/zephyr/zephyr.hex "$ARTEFACT_DIR/"
-          cp ~/ncs/build/zephyr/zephyr.bin "$ARTEFACT_DIR/"
-          cp ~/ncs/build/zephyr/zephyr.elf "$ARTEFACT_DIR/"
+          cp ~/ncs/build/peripheral/zephyr/zephyr.hex "$ARTEFACT_DIR/"
+          cp ~/ncs/build/peripheral/zephyr/zephyr.bin "$ARTEFACT_DIR/"
+          cp ~/ncs/build/peripheral/zephyr/zephyr.elf "$ARTEFACT_DIR/"
 
           # Include the build log for debugging failed runs
           cp build.log "$ARTEFACT_DIR/"
