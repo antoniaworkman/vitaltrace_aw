@@ -208,37 +208,37 @@ jobs:
   # Job 2: Unity unit tests (host machine, no hardware needed)
   # --------------------------------------------------------------------------
   unit_tests:
-  name: Unity Unit Tests
-  runs-on: ubuntu-22.04
-  needs: build
+    name: Unity Unit Tests
+    runs-on: ubuntu-22.04
+    needs: build
 
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: sudo apt-get install -y cmake gcc
+      - name: Install dependencies
+        run: sudo apt-get install -y cmake gcc
 
-    - name: Clone Unity
-      run: |
-        git clone https://github.com/ThrowTheSwitch/Unity \
-          ${{ github.workspace }}/peripheral/tests/unity
+      - name: Clone Unity
+        run: |
+          git clone https://github.com/ThrowTheSwitch/Unity \
+            ${{ github.workspace }}/peripheral/tests/unity
 
-    - name: Build and run tests
-      run: |
-        cd ${{ github.workspace }}/peripheral/tests
-        mkdir -p build && cd build
-        cmake ..
-        make
-        ctest -v --output-on-failure 2>&1 | tee test_results.txt
+      - name: Build and run tests
+        run: |
+          cd ${{ github.workspace }}/peripheral/tests
+          mkdir -p build && cd build
+          cmake ..
+          make
+          ctest -v --output-on-failure 2>&1 | tee test_results.txt
 
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: unity-test-results-${{ github.sha }}
-        path: peripheral/tests/build/test_results.txt
-        retention-days: 30
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-test-results-${{ github.sha }}
+          path: peripheral/tests/build/test_results.txt
+          retention-days: 30
 
   # --------------------------------------------------------------------------
   # Job 3: Summary (update needs to include unit_tests)
