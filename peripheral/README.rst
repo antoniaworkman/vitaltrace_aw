@@ -9,7 +9,8 @@ simulate discharge of the battery (at a rate of 1% per 5 seconds) and send an up
 to a connected central device at the same frequency the level changes. A (fetal) heart rate module has been implemented
 to send dummy heart rate data to a central device once notifications are activated by writing to the control characteristic
 in the application layer. In addition to the data buffer, an index value has been added to the BLE packet in case 
-the order of received data is important for the central device.
+the order of received data is important for the central device. Notifications for the heart rate data characteristic
+are encoded as Protocol Buffers for greater cohesion between devices.
 
 Assumptions
 ************
@@ -53,7 +54,7 @@ Building and Running
 
 nrf Connect SDK: v3.2.4
 nrf Connect Toolchain: v3.2.4
-Board target: nrf5340dk/nrf5340/cpuapp (or any board with BLE support)
+Board target: nrf52840dongle_nrf52840
 Base configuration file: prj.conf
 
 In VSCode, once the SDK and Toolchain have been installed and nrf Connect extension added.

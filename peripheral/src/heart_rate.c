@@ -101,8 +101,6 @@ void hr_ctrl_set(bool ctrl_val)
 /* --- Private Function Definitions --------------------------------------- */
 static void stream_thread_fn(void *a, void *b, void *c)
 {
-    static int32_t counter = 0;
-
     while (1) {
         if (is_hr_streaming() == true) {
             Notify msg = Notify_init_zero;

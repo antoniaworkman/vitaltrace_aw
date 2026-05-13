@@ -9,7 +9,6 @@
 
 #define STREAM_STACK_SIZE   1024
 #define STREAM_PRIORITY     5
-#define STREAM_INTERVAL_MS  100
 
 /** Control codes written by the central */
 typedef enum {
