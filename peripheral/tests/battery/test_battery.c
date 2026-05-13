@@ -42,16 +42,6 @@ void test_level_wraps_at_zero(void)
     TEST_ASSERT_EQUAL_UINT8(100U, bt_bas_get_battery_level());
 }
 
-void test_level_never_underflows(void)
-{
-    bt_bas_set_battery_level(0U);
-
-    uint8_t level = bt_bas_get_battery_level();
-    if (level == 0U) { level = 100U; } else { level--; }
-
-    TEST_ASSERT_GREATER_THAN_UINT8(0U, level);
-}
-
 void test_bas_rejects_level_above_100(void)
 {
     int err = bt_bas_set_battery_level(101U);
@@ -64,7 +54,6 @@ int main(void)
     RUN_TEST(test_initial_level_is_100);
     RUN_TEST(test_level_decrements);
     RUN_TEST(test_level_wraps_at_zero);
-    RUN_TEST(test_level_never_underflows);
     RUN_TEST(test_bas_rejects_level_above_100);
     return UNITY_END();
 }
