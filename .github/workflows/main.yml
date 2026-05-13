@@ -138,27 +138,6 @@ jobs:
           echo " Build complete"
           echo "=========================================="
 
-      - name: Debug — find build artefacts
-        if: always()
-        run: |
-          echo "--- Full build directory tree ---"
-          find ~/ncs/build -type f \( -name "*.hex" -o -name "*.bin" -o -name "*.elf" \) 2>/dev/null
-
-          echo "--- Top level of build dir ---"
-          ls ~/ncs/build/ 2>/dev/null || echo "build dir not found"
-
-          echo "--- Contents of ncs dir ---"
-          ls ~/ncs/ 2>/dev/null || echo "ncs dir not found"
-
-          echo "--- Search for hex files anywhere under ~/ncs ---"
-          find ~/ncs -name "*.hex" 2>/dev/null
-
-          echo "--- Contents of _sysbuild ---"
-          ls ~/ncs/build/_sysbuild/ 2>/dev/null
-
-          echo "--- Recursive build structure (dirs only) ---"
-          find ~/ncs/build -type d 2>/dev/null
-
       # ------------------------------------------------------------------------
       - name: Verify build artefacts exist
         run: |
@@ -249,7 +228,15 @@ jobs:
 
       - name: Find nanopb path
         run: |
-          NANOPB_PATH=$(find /opt/nordic/ncs/v3.2.4 -name "pb.h" 2>/dev/null | head -1 | xargs dirname)
+          NANOPB_PATH=$(find ~/ncs -name "pb.h" 2>/dev/null | head -1 | xargs dirname)
+    
+          if [ -z "$NANOPB_PATH" ]; then
+            echo "ERROR: pb.h not found anywhere under ~/ncs"
+            find ~/ncs -name "*.h" | grep -i nano | head -10
+            exit 1
+          fi
+
+          echo "Found nanopb at: $NANOPB_PATH"
           echo "NANOPB_DIR=${NANOPB_PATH}" >> $GITHUB_ENV
 
       - name: Build and run tests
