@@ -18,7 +18,7 @@ concurrency:
 env:
   NCS_VERSION: v3.2.4
   APP_DIR: peripheral
-  BOARD: nrf52840dongle_nrf52840
+  BOARD: nrf52840dongle
   BUILD_DIR: /home/runner/ncs/build
 
 jobs:
@@ -33,7 +33,7 @@ jobs:
       fail-fast: false
       matrix:
         board:
-          - nrf52840dongle_nrf52840
+          - nrf52840dongle
         # Add more boards here if needed
 
     steps:
