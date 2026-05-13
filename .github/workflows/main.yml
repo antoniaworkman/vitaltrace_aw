@@ -1,0 +1,283 @@
+name: Firmware CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+# Cancel in-progress runs on the same branch to save runner minutes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NCS_VERSION: v3.2.4
+  APP_DIR: peripheral
+  BOARD: nrf5340dk_nrf5340_cpuapp
+
+jobs:
+  # --------------------------------------------------------------------------
+  # Job 1: Build firmware
+  # --------------------------------------------------------------------------
+  build:
+    name: Build (${{ matrix.board }})
+    runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        board:
+          - nrf5340dk_nrf5340_cpuapp
+        # Add more boards here if needed
+
+    steps:
+      # ------------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # full history needed for west to resolve manifests
+
+      # ------------------------------------------------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ------------------------------------------------------------------------
+      - name: Cache west modules
+        uses: actions/cache@v4
+        id: ncs-cache
+        with:
+          # Cache the entire NCS west workspace except build artefacts
+          path: |
+            ~/ncs
+            ~/.cache/pip
+          key: ncs-${{ env.NCS_VERSION }}-${{ runner.os }}
+          restore-keys: |
+            ncs-${{ env.NCS_VERSION }}-
+
+      # ------------------------------------------------------------------------
+      - name: Install west and Python dependencies
+        run: |
+          pip install west==1.2.0
+          pip install cmake ninja
+
+      # ------------------------------------------------------------------------
+      - name: Initialise west workspace (NCS ${{ env.NCS_VERSION }})
+        if: steps.ncs-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/ncs
+          cd ~/ncs
+          west init -m https://github.com/nrfconnect/sdk-nrf --mr ${{ env.NCS_VERSION }}
+          west update --narrow --fetch-opt=--depth=1
+          west zephyr-export
+
+      # Re-export even on cache hit — CMake needs the Zephyr package path
+      - name: Export Zephyr CMake package
+        run: |
+          cd ~/ncs
+          west zephyr-export
+
+      # ------------------------------------------------------------------------
+      - name: Install Zephyr Python requirements
+        run: |
+          pip install -r ~/ncs/zephyr/scripts/requirements.txt
+          pip install -r ~/ncs/nrf/scripts/requirements.txt
+
+      # ------------------------------------------------------------------------
+      - name: Install nRF Connect SDK toolchain (Zephyr SDK ${{ env.NCS_VERSION }})
+        run: |
+          # Download the Zephyr SDK bundle that matches NCS v3.2.4
+          ZSDK_VERSION=0.17.0
+          ZSDK_URL="https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v${ZSDK_VERSION}/zephyr-sdk-${ZSDK_VERSION}_linux-x86_64_minimal.tar.xz"
+
+          echo "Downloading Zephyr SDK ${ZSDK_VERSION}..."
+          wget -q "${ZSDK_URL}" -O /tmp/zephyr-sdk.tar.xz
+
+          echo "Extracting SDK..."
+          mkdir -p ~/zephyr-sdk
+          tar -xf /tmp/zephyr-sdk.tar.xz -C ~/zephyr-sdk --strip-components=1
+
+          echo "Installing ARM toolchain target..."
+          ~/zephyr-sdk/setup.sh -t arm-zephyr-eabi -h -c
+
+          echo "ZEPHYR_SDK_INSTALL_DIR=$HOME/zephyr-sdk" >> $GITHUB_ENV
+
+      # ------------------------------------------------------------------------
+      - name: Copy application into west workspace
+        run: |
+          # Link your repo into the NCS workspace so west can find it
+          cp -r ${{ github.workspace }} ~/ncs/vitaltrace
+
+      # ------------------------------------------------------------------------
+      - name: Build firmware
+        run: |
+          cd ~/ncs
+
+          echo "=========================================="
+          echo " Building for board: ${{ matrix.board }}"
+          echo " Application:        ${{ env.APP_DIR }}"
+          echo " NCS version:        ${{ env.NCS_VERSION }}"
+          echo "=========================================="
+
+          west build \
+            --board ${{ matrix.board }} \
+            --build-dir build \
+            vitaltrace/${{ env.APP_DIR }} \
+            -- \
+            -DCONFIG_BOOTLOADER_MCUBOOT=n \
+            2>&1 | tee build.log
+
+          echo "=========================================="
+          echo " Build complete"
+          echo "=========================================="
+
+      # ------------------------------------------------------------------------
+      - name: Verify build artefacts exist
+        run: |
+          echo "--- Checking for expected artefacts ---"
+
+          HEX=~/ncs/build/zephyr/zephyr.hex
+          BIN=~/ncs/build/zephyr/zephyr.bin
+          ELF=~/ncs/build/zephyr/zephyr.elf
+
+          for f in "$HEX" "$BIN" "$ELF"; do
+            if [ -f "$f" ]; then
+              SIZE=$(du -h "$f" | cut -f1)
+              echo "  ✓ $(basename $f)  ($SIZE)"
+            else
+              echo "  ✗ MISSING: $f"
+              exit 1
+            fi
+          done
+
+          echo "--- Memory usage summary ---"
+          cat ~/ncs/build/zephyr/zephyr.map \
+            | grep -A5 "Memory region" || true
+
+          # Print ROM/RAM usage from west build output
+          grep -E "^(Flash|RAM|rom|ram)" build.log || true
+
+      # ------------------------------------------------------------------------
+      - name: Collect artefacts
+        run: |
+          ARTEFACT_DIR=${{ github.workspace }}/artefacts/${{ matrix.board }}
+          mkdir -p "$ARTEFACT_DIR"
+
+          cp ~/ncs/build/zephyr/zephyr.hex "$ARTEFACT_DIR/"
+          cp ~/ncs/build/zephyr/zephyr.bin "$ARTEFACT_DIR/"
+          cp ~/ncs/build/zephyr/zephyr.elf "$ARTEFACT_DIR/"
+
+          # Include the build log for debugging failed runs
+          cp build.log "$ARTEFACT_DIR/"
+
+          # Include merged hex if MCUboot is enabled
+          if [ -f ~/ncs/build/zephyr/merged.hex ]; then
+            cp ~/ncs/build/zephyr/merged.hex "$ARTEFACT_DIR/"
+            echo "  ✓ merged.hex included"
+          fi
+
+          echo "--- Artefact directory contents ---"
+          ls -lh "$ARTEFACT_DIR"
+
+      # ------------------------------------------------------------------------
+      - name: Upload firmware artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.board }}-${{ github.sha }}
+          path: artefacts/${{ matrix.board }}/
+          retention-days: 30
+          if-no-files-found: error
+
+      # ------------------------------------------------------------------------
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ matrix.board }}-${{ github.sha }}
+          path: build.log
+          retention-days: 7
+
+  # --------------------------------------------------------------------------
+  # Job 2: Unity unit tests (host machine, no hardware needed)
+  # --------------------------------------------------------------------------
+  unit_tests:
+    name: Unity Unit Tests
+    runs-on: ubuntu-22.04
+    needs: build      # only run if firmware build passes
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc
+
+      - name: Clone Unity
+        run: |
+          git clone https://github.com/ThrowTheSwitch/Unity \
+            ${{ github.workspace }}/peripheral/tests/unity
+
+      - name: Find nanopb path
+        run: |
+          NANOPB_PATH=$(find /opt/nordic/ncs/v3.2.4 -name "pb.h" 2>/dev/null | head -1 | xargs dirname)
+          echo "NANOPB_DIR=${NANOPB_PATH}" >> $GITHUB_ENV
+
+      - name: Build and run tests
+        run: |
+          cd ${{ github.workspace }}/peripheral/tests
+          mkdir -p build && cd build
+
+          cmake .. -DNANOPB_DIR=${{ env.NANOPB_DIR }}
+
+          echo "=========================================="
+          echo " Building Unity tests"
+          echo "=========================================="
+          make 2>&1 | tee build.log
+
+          echo "=========================================="
+          echo " Running tests"
+          echo "=========================================="
+          ctest -v --output-on-failure 2>&1 | tee test_results.txt
+
+      - name: Upload test results
+        if: always()    # upload even on failure so you can inspect the output
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-test-results-${{ github.sha }}
+          path: |
+            peripheral/tests/build/test_results.txt
+            peripheral/tests/build/build.log
+          retention-days: 30
+
+  # --------------------------------------------------------------------------
+  # Job 3: Summary (update needs to include unit_tests)
+  # --------------------------------------------------------------------------
+  summary:
+    name: Build Summary
+    runs-on: ubuntu-22.04
+    needs: [build, unit_tests]    # wait for both jobs
+    if: always()
+
+    steps:
+      - name: Write job summary
+        run: |
+          echo "## CI Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Firmware Build | ${{ needs.build.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests     | ${{ needs.unit_tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| NCS Version | \`${{ env.NCS_VERSION }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
