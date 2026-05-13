@@ -21,7 +21,7 @@ struct k_work_delayable {
 typedef void (*k_work_handler_t)(struct k_work *work);
 
 #define K_WORK_DELAYABLE_DEFINE(name, handler_fn) \
-    static struct k_work_delayable name = { .work = { .handler = handler_fn } }
+    struct k_work_delayable name = { .work = { .handler = handler_fn } }
 
 static inline void k_work_schedule(struct k_work_delayable *w, int t)
 {
