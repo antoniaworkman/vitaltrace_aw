@@ -228,11 +228,33 @@ jobs:
 
       - name: Find nanopb path
         run: |
-          NANOPB_PATH=$(find ~/ncs -name "pb.h" 2>/dev/null | head -1 | xargs dirname)
-    
+          # Known nanopb locations in NCS west workspace
+          KNOWN_PATHS=(
+            "$HOME/ncs/modules/lib/nanopb"
+            "$HOME/ncs/zephyr/modules/nanopb"
+            "$HOME/ncs/modules/nanopb"
+          )
+
+          NANOPB_PATH=""
+          for p in "${KNOWN_PATHS[@]}"; do
+            if [ -f "$p/pb.h" ]; then
+              NANOPB_PATH="$p"
+              break
+            fi
+          done
+
+          # Fallback: search entire workspace
           if [ -z "$NANOPB_PATH" ]; then
-            echo "ERROR: pb.h not found anywhere under ~/ncs"
-            find ~/ncs -name "*.h" | grep -i nano | head -10
+            echo "Not found in known paths, searching..."
+            PB_H=$(find ~/ncs -name "pb.h" 2>/dev/null | head -1)
+            if [ -n "$PB_H" ]; then
+              NANOPB_PATH=$(dirname "$PB_H")
+            fi
+          fi
+
+          if [ -z "$NANOPB_PATH" ]; then
+            echo "ERROR: pb.h not found — listing modules directory:"
+            ls ~/ncs/modules/lib/ 2>/dev/null || echo "modules/lib not found"
             exit 1
           fi
 
