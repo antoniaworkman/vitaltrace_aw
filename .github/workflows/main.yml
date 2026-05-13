@@ -113,7 +113,7 @@ jobs:
       - name: Copy application into west workspace
         run: |
           # Link your repo into the NCS workspace so west can find it
-          cp -r ${{ github.workspace }} ~/ncs/vitaltrace
+          cp -r ${{ github.workspace }} ~/ncs/vitaltrace_aw
 
       # ------------------------------------------------------------------------
       - name: Build firmware
@@ -129,7 +129,7 @@ jobs:
           west build \
             --board ${{ matrix.board }} \
             --build-dir build \
-            vitaltrace/${{ env.APP_DIR }} \
+            vitaltrace_aw/${{ env.APP_DIR }} \
             -- \
             -DCONFIG_BOOTLOADER_MCUBOOT=n \
             2>&1 | tee ${{ github.workspace }}/build.log
