@@ -230,7 +230,7 @@ jobs:
           mkdir -p build && cd build
           cmake ..
           make
-          ctest -v --output-on-failure 2>&1 | tee test_results.txt
+          ctest --verbose --output-on-failure 2>&1 | tee test_results.txt
 
       - name: Upload test results
         if: always()
